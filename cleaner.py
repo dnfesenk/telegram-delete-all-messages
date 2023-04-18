@@ -1,38 +1,57 @@
+import base64
 import os
-import json
-
+import tempfile
 from time import sleep
 
 from pyrogram import Client
+from pyrogram.errors import FloodWait, UnknownError
 from pyrogram.raw.functions.messages import Search
 from pyrogram.raw.types import InputPeerSelf, InputMessagesFilterEmpty
-from pyrogram.raw.types.messages import ChannelMessages
-from pyrogram.errors import FloodWait, UnknownError
 
-cachePath = os.path.abspath(__file__)
-cachePath = os.path.dirname(cachePath)
-cachePath = os.path.join(cachePath, "cache")
+# Retrieve API_ID and API_HASH from environment variables or user input
+API_ID = os.getenv('API_ID', None)
+API_HASH = os.getenv('API_HASH', None)
 
-if os.path.exists(cachePath):
-    with open(cachePath, "r") as cacheFile:
-        cache = json.loads(cacheFile.read())
-    
-    API_ID = cache["API_ID"]
-    API_HASH = cache["API_HASH"]
-else:
-    API_ID = os.getenv('API_ID', None) or int(input('Enter your Telegram API id: '))
-    API_HASH = os.getenv('API_HASH', None) or input('Enter your Telegram API hash: ')
+# Check if API_ID and API_HASH are defined, if not print error message and exit
+if not API_ID or not API_HASH:
+    print("Error: API_ID or API_HASH is not defined. Please provide valid values.")
+    exit(-1)
 
-app = Client("client", api_id=API_ID, api_hash=API_HASH)
+# Retrieve the list of chats to exclude from the environment variable or use an empty set
+# EXCLUDE = set(os.getenv("EXCLUDE", "").split(",")) if os.getenv("EXCLUDE") else set()
+
+# Retrieve the list of chats to include from the environment variable or use an empty set
+INCLUDE = set(os.getenv("INCLUDE", "").split(",")) if os.getenv("INCLUDE") else set()
+
+# Base64 encoded session file string
+base64_string = ""
+
+
+# Function to write the base64 decoded session file to a temporary directory
+def write_base64_to_temp_file():
+    tmp_dir = tempfile.mkdtemp()
+    file_path = os.path.join(tmp_dir, 'client.session')
+
+    # Decode the base64 string and write it to the file
+    with open(file_path, 'wb') as file:
+        decoded_data = base64.b64decode(base64_string)
+        file.write(decoded_data)
+
+    print(f"Temporary file created at {tmp_dir}")
+    return tmp_dir
+
+
+# Create a temporary directory and write the decoded session file
+temp_dir = write_base64_to_temp_file()
+
+# Create a Pyrogram Client instance with the temporary session file
+app = Client("client", api_id=API_ID, api_hash=API_HASH, workdir=temp_dir)
 app.start()
 
-if not os.path.exists(cachePath):
-    with open(cachePath, "w") as cacheFile:
-        cache = {"API_ID": API_ID, "API_HASH": API_HASH}
-        cacheFile.write(json.dumps(cache))
 
-
+# Cleaner class definition
 class Cleaner:
+    # Initialize the cleaner with optional chat list and chunk sizes
     def __init__(self, chats=None, search_chunk_size=100, delete_chunk_size=100):
         self.chats = chats or []
         if search_chunk_size > 100:
@@ -45,6 +64,12 @@ class Cleaner:
         self.search_chunk_size = search_chunk_size
         self.delete_chunk_size = delete_chunk_size
 
+        # Get all chats and exclude the ones specified in the EXCLUDE set
+        self.chats = self.get_all_chats()
+        groups_str = ', '.join(c.title for c in self.chats)
+        print(f'\nSelected {groups_str}.\n')
+
+    # Function to divide a list into n-sized chunks
     @staticmethod
     def chunks(l, n):
         """Yield successive n-sized chunks from l.
@@ -52,6 +77,7 @@ class Cleaner:
         for i in range(0, len(l), n):
             yield l[i:i + n]
 
+    # Function to get all chats of type 'group' and 'supergroup' that are not in the EXCLUDE set
     @staticmethod
     def get_all_chats():
         dialogs = app.get_dialogs(pinned_only=True)
@@ -59,54 +85,22 @@ class Cleaner:
         dialog_chunk = app.get_dialogs()
         while len(dialog_chunk) > 0:
             dialogs.extend(dialog_chunk)
-            dialog_chunk = app.get_dialogs(offset_date=dialogs[-1].top_message.date-1)
+            dialog_chunk = app.get_dialogs(offset_date=dialogs[-1].top_message.date - 1)
 
-        return [d.chat for d in dialogs]
+        # Return chats of type 'group' or 'supergroup' with titles not in the EXCLUDE set
+        # return [d.chat for d in dialogs if d.chat.type in ('group', 'supergroup') and d.chat.title not in EXCLUDE]
 
-    def select_groups(self, recursive=0):
-        chats = self.get_all_chats()
-        groups = [c for c in chats if c.type in ('group', 'supergroup')]
+        # Return chats of type 'group' or 'supergroup' with titles in the INCLUDE set
+        return [d.chat for d in dialogs if d.chat.type in ('group', 'supergroup') and d.chat.title in INCLUDE]
 
-        print('Delete all your messages in')
-        for i, group in enumerate(groups):
-            print(f'  {i+1}. {group.title}')
-
-        print(
-            f'  {len(groups) + 1}. '
-            '(!) DELETE ALL YOUR MESSAGES IN ALL OF THOSE GROUPS (!)\n'
-        )
-
-        nums_str = input('Insert option numbers (comma separated): ')
-        nums = map(lambda s: int(s.strip()), nums_str.split(','))
-
-        for n in nums:
-            if not 1 <= n <= len(groups) + 1:
-                print('Invalid option selected. Exiting...')
-                exit(-1)
-
-            if n == len(groups) + 1:
-                print('\nTHIS WILL DELETE ALL YOUR MESSSAGES IN ALL GROUPS!')
-                answer = input('Please type "I understand" to proceed: ')
-                if answer.upper() != 'I UNDERSTAND':
-                    print('Better safe than sorry. Aborting...')
-                    exit(-1)
-                self.chats = groups
-                break
-            else:
-                self.chats.append(groups[n - 1])
-        
-        groups_str = ', '.join(c.title for c in self.chats)
-        print(f'\nSelected {groups_str}.\n')
-
-        if recursive == 1:
-            self.run()
-
+    # Main function to run the cleaner
     def run(self):
         for chat in self.chats:
             peer = app.resolve_peer(chat.id)
             message_ids = []
             add_offset = 0
 
+            # Search for messages in the current chat
             while True:
                 q = self.search_messages(peer, add_offset)
                 message_ids.extend(msg.id for msg in q['messages'])
@@ -116,8 +110,10 @@ class Cleaner:
                     break
                 add_offset += self.search_chunk_size
 
+            # Delete the found messages
             self.delete_messages(chat.id, message_ids)
 
+    # Function to delete messages in a chat using the message IDs
     def delete_messages(self, chat_id, message_ids):
         print(f'Deleting {len(message_ids)} messages with message IDs:')
         print(message_ids)
@@ -127,6 +123,7 @@ class Cleaner:
             except FloodWait as flood_exception:
                 sleep(flood_exception.x)
 
+    # Function to search for messages in a chat using the Pyrogram Search method
     def search_messages(self, peer, add_offset):
         print(f'Searching messages. OFFSET: {add_offset}')
         return app.send(
@@ -148,13 +145,13 @@ class Cleaner:
         )
 
 
-if __name__ == '__main__':
+# Function to handle the execution of the Cleaner class
+def handler(event, context):
     try:
         deleter = Cleaner()
-        deleter.select_groups()
         deleter.run()
     except UnknownError as e:
-        print(f'UnknownError occured: {e}')
+        print(f'UnknownError occurred: {e}')
         print('Probably API has changed, ask developers to update this utility')
     finally:
         app.stop()

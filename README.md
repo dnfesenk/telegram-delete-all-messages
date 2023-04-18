@@ -1,83 +1,96 @@
-# telegram-delete-all-messages
-Delete all your messages in supergroups with python script.
+# Telegram Group Cleaner
 
-## Installation
-To install this script you have to download project and install requirements:
+Telegram Group Cleaner is a Python script that helps you delete all your messages in Telegram groups and supergroups.
 
-### Linux
+## Features
+
+- Deletes all your messages in specified groups and supergroups.
+- Supports filtering groups by their titles.
+- Handles rate limits imposed by the Telegram API.
+- Can be easily deployed to serverless platforms like Yandex Cloud Functions.
+
+## Requirements
+
+- Python 3.7 or higher
+- [Pyrogram](https://github.com/pyrogram/pyrogram) library
+
+# Installation
+
+1. Clone the original repository:
+
 ```
-git clone https://github.com/gurland/telegram-delete-all-messages
+git clone https://github.com/gurland/telegram-delete-all-messages.git
 cd telegram-delete-all-messages
-pip install -r requirements.txt
-python cleaner.py
 ```
 
-### Windows
-- Download zip file from this repo and unpack it
-- Install latest [CPython 3](https://www.python.org) version
-- Run install.bat
-- Run start.bat
+2. Follow the instructions in the repository's README to set up the required environment variables and generate
+   the `client.session` file.
+
+3. Encode the `client.session` file as a base64 string:
+
+On Linux:
+
+```
+base64 -w0 client.session > client_session_base64.txt
+```
+
+On Windows (using PowerShell):
+
+```
+[System.Convert]::ToBase64String([System.IO.File]::ReadAllBytes("client.session")) | Set-Content -Path "client_session_base64.txt"
+```
+
+4. Open the `client_session_base64.txt` file, copy the base64 string, and replace the value of the `base64_string`
+   variable in the `cleaner.py` script with the copied string.
+
+5. Proceed with the rest of the instructions in this README to use the Telegram Group Cleaner script.
 
 ## Obtain standalone telegram app API credentials
+
 - Login to https://my.telegram.org/
 - Select `API development tools` link
 - Create standalone application
 - Copy app_id and app_hash
 
-## Usage
-> You need both App api_id and App api_hash to use script.
+## Deployment to Yandex Cloud Functions
 
-#### Environment variables
-You could set API_ID and API_HASH environment variables to prevent entering API credentials manually.
+This script can also be used as a Yandex Cloud Function. To deploy it, follow
+the [official Yandex Cloud Functions documentation](https://cloud.yandex.com/en-ru/docs/functions/quickstart) and use
+the `handler` function from the `cleaner.py` script as the entry point.
 
-#### Start
-After starting script you will be prompted:
-- To enter your Telegram APP credentials (if no environment variables found)
-- Your account phone and then code sent to you by Telegram
+## Required environment variables:
+
 ```
-$ python cleaner.py
-
-Enter your Telegram API id: 123456
-Enter your Telegram API hash: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-Pyrogram v0.14.1, Copyright (C) 2017-2019 Dan <https://github.com/delivrance>
-Licensed under the terms of the GNU Lesser General Public License v3 or later (LGPLv3+)
-
-Enter phone number: +123456789012
-Is "+123456789012" correct? (y/n): y
-Enter phone code: 88988
-Logged in successfully as Stanislav
+API_ID=<your_api_id>
+API_HASH=<your_api_hash>
+INCLUDE=<comma_separated_list_of_group_titles>
 ```
 
-#### Choosing supergroup
-- After providing needed information you will get your supergroup dialogs
-- Enter number found near desired supergroup title
-```
-1. Python community
-2. Rust Beginners
-3. IDE & Editors
+Replace `<your_api_id>`, `<your_api_hash>`, and `<comma_separated_list_of_group_titles>` with your actual API ID, API
+hash, and a comma-separated list of group titles you want to include, respectively.
 
-Insert group number:
-```
+## Disclaimer
 
-#### Message removal process
-- After choosing supergroup you would get informed about messages removal process
-```
-Insert group number: 2
-Selected Rust Beginners
+Please be aware that using this script may result in the permanent deletion of your messages in the specified Telegram
+groups and supergroups. Use this script at your own risk. We are not responsible for any loss or damage caused by the
+use of this script.
 
-Searching messages. OFFSET: 0
-Found 4 your messages in selected supergroup
-Deleting 4 messages with next message IDs:
-[23807, 23799, 23757, 23756]
-```
+This script is provided "as is" without warranty of any kind, either expressed or implied, including, but not limited
+to, the implied warranties of merchantability and fitness for a particular purpose. The entire risk as to the quality
+and performance of the script is with you. Should the script prove defective, you assume the cost of all necessary
+servicing, repair, or correction.
 
-## Contribution
-To make any changes in our codebase, please do the following:
-1. Create or find an Issue describing what needs to be done.
-2. Discuss all changes needed.
-3. Fork repository, clone it, create branch with briefly descriptive name of feature/bufix you are adding, e.g. `git checkout -b fix-sleep-treshold`.
-4. Create Pull Request. Please, test all changes before creating PR and explicitly declare whether testing was succesful or not.
-5. Wait untill available contributors review changes.
-6. If everything is OK your contribution gets approved.
+In no event shall the author, the organization he represents, or anyone else involved in the creation, production, or
+delivery of the script be liable for any damages whatsoever (including, without limitation, damages for loss of business
+profits, business interruption, loss of business information, or any other pecuniary loss) arising out of the use of or
+inability to use the script, even if the author has been advised of the possibility of such damages.
 
-Note: it's very important to keep PRs brief and clear. Resolve single issue by a single PR.
+By using this script, you agree to assume all risks and responsibilities associated with its use. The author and any
+contributors are not responsible for any loss, damage, or harm that may result from your use of the script, including
+but not limited to data loss, privacy breaches, or any other negative consequences. You understand and acknowledge that
+you are using this script at your own risk, and you agree to hold the author and any contributors harmless from any
+claims, losses, or damages that may arise as a result of your use of the script.
+
+### License
+
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
